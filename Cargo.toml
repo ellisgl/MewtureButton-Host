@@ -1,0 +1,18 @@
+[package]
+name = "pa_device_list"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+libc = "0.2.144"
+libpulse-binding = "2.27.1"
+libpulse-glib-binding = "2.27.1"
+libpulse-simple-binding = "2.27.1"
+libpulse-sys = "1.20.1"
+pulsectl-rs = "0.3.2"
+serialport = "4.2.1"
+indicatif = "0.17.3"
+dialoguer = "0.10.4"
+ding-ding-ack-ack = "0.2.1"
