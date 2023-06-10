@@ -1,0 +1,271 @@
+extern crate serialport;
+
+use pulser::api::PAIdent;
+use pulser::simple::PulseAudio;
+use serde::Deserialize;
+use serialport::SerialPort;
+use std::fs::read_to_string;
+use std::process::exit;
+use std::time::Duration;
+use toml;
+
+#[derive(Debug, Deserialize)]
+struct Config {
+    audio_device_name: String,
+    audio_device_index: u32,
+    serial_port: String,
+}
+
+fn main() {
+    let filename = "config.toml";
+    let content = match read_to_string(filename) {
+        Ok(c) => c,
+        Err(_) => {
+            eprintln!("Could not read file `{}`", filename);
+            exit(1);
+        }
+    };
+
+    let config: Config = match toml::from_str(&content) {
+        Ok(c) => c,
+        Err(e) => {
+            eprintln!("Unable to load data from `{}`. Error: {}", filename, e);
+            exit(1);
+        }
+    };
+    println!("{:?}", config.audio_device_name);
+    println!("{:?}", config.audio_device_index);
+    println!("{:?}", config.serial_port);
+
+    let pa = PulseAudio::connect(Some("Metwer Button"));
+    match pa.set_default_source(PAIdent::Index(config.audio_device_index)) {
+        Ok(_) => {}
+        Err(e) => {
+            eprintln!("Error setting default source: {}", e);
+            exit(1)
+        }
+    };
+
+    // Check for the serial device.
+    let serial_port = serialport::new(config.serial_port, 115200)
+        .timeout(Duration::from_millis(300))
+        .open();
+
+    let mut port = match serial_port {
+        Ok(p) => p,
+        Err(error) => {
+            eprintln!("Error reading from serial port: {}", error);
+            exit(1); // Continue to the next iteration of the loop
+        }
+    };
+
+    let mut mute_state = match pa.get_source_mute(PAIdent::Index(config.audio_device_index)) {
+        Ok(m) => m,
+        Err(e) => {
+            eprintln!("Error getting mute state: {}", e);
+            exit(1)
+        }
+    };
+
+    let mut received_buffer: Vec<u8> = vec![0; 64];
+    loop {
+        let bytes_read = match port.read(&mut received_buffer) {
+            Ok(bytes_read) => bytes_read,
+            Err(_e) => { 0 }
+        };
+
+        if bytes_read > 7 {
+            // Parse the received data
+            let message = ddaa_protocol::parse_protocol_message(&mut received_buffer);
+            println!("{:?}", message);
+            if let Some(parsed_message) = message {
+                if parsed_message.message_type == ddaa_protocol::MessageType::Request {
+                    match parsed_message.command {
+                        ddaa_protocol::Command::Ping => {
+                            // Received ping, response to our caller.
+                            respond_to_ping(&mut port, parsed_message);
+                        }
+                        ddaa_protocol::Command::Read => {
+                            // Received read request.
+                            if parsed_message.variable == 0x00 {
+                                // Respond with current mute state.
+                                match port.write(&ddaa_protocol::create_protocol_buffer(
+                                    ddaa_protocol::MessageType::ResponseSuccess,
+                                    ddaa_protocol::Command::Read,
+                                    parsed_message.variable,
+                                    &[u8::from(!mute_state)],
+                                )) {
+                                    Ok(_) => {}
+                                    Err(_e) => {
+                                        println!("Error writing to serial port");
+                                    }
+                                }
+                            }
+                        }
+                        ddaa_protocol::Command::Write => {
+                            // Received write request.
+                            if parsed_message.variable == 0x00 {
+                                match parsed_message.data[0] {
+                                    0x00 => {
+                                        // Received mute request.
+                                        // Set source mute state to true.
+                                        match pa.set_source_mute(
+                                            PAIdent::Index(config.audio_device_index),
+                                            false,
+                                        ) {
+                                            Ok(_) => {
+                                                // We don't have this implemented yet on the hardware side.
+                                            }
+                                            Err(e) => {
+                                                eprintln!("Error unmuting: {}", e);
+                                                exit(1);
+                                            }
+                                        }
+                                    }
+                                    0x01 => {
+                                        // Received unmute request.
+                                        // Set source mute state to false.
+                                        match pa.set_source_mute(
+                                            PAIdent::Index(config.audio_device_index),
+                                            true,
+                                        ) {
+                                            Ok(_) => {
+                                                // We don't have this implemented yet on the hardware side.
+                                            }
+                                            Err(e) => {
+                                                eprintln!("Error muting: {}", e);
+                                                exit(1);
+                                            }
+                                        }
+                                    }
+                                    0x02 => {
+                                        // Received invert mute request.
+                                        // Set the source mute state to the opposite of the current state.
+                                        match pa.set_source_mute(
+                                            PAIdent::Index(config.audio_device_index),
+                                            !mute_state,
+                                        ) {
+                                            Ok(_) => {
+                                                // Responds with success message.
+                                                match port.write(
+                                                    &ddaa_protocol::create_protocol_buffer(
+                                                        ddaa_protocol::MessageType::ResponseSuccess,
+                                                        ddaa_protocol::Command::Write,
+                                                        parsed_message.variable,
+                                                        &[u8::from(!mute_state)],
+                                                    ),
+                                                ) {
+                                                    Ok(_) => {}
+                                                    Err(e) => {
+                                                        eprintln!("Error writing to serial port: {}", e);
+                                                        exit(1);
+                                                    }
+                                                };
+                                            }
+                                            Err(e) => {
+                                                eprintln!("Error inverting mute: {}", e);
+                                                exit(1);
+                                            }
+                                        }
+                                    }
+                                    3_u8..=u8::MAX => {
+                                        eprintln!(
+                                            "Received unknown value:{:?}",
+                                            parsed_message.data[0]
+                                        );
+                                    }
+                                }
+                                // Data for mute variable is invalid.
+                                if parsed_message.data[0] > 0x02 {
+                                    match port.write(&ddaa_protocol::create_protocol_buffer(
+                                        ddaa_protocol::MessageType::ResponseError,
+                                        parsed_message.command,
+                                        parsed_message.variable,
+                                        &parsed_message.data,
+                                    )) {
+                                        Ok(_) => {
+                                            // We could respond with an error, but it's not implemented in firmware.
+                                        }
+                                        Err(e) => {
+                                            eprintln!("Error writing to serial port: {}", e);
+                                            // Not going to exit, let's just continue for S&Gs.
+                                        }
+                                    }
+                                } else {
+                                    // We have a valid request, respond with success.
+                                    match port.write(&ddaa_protocol::create_protocol_buffer(
+                                        ddaa_protocol::MessageType::ResponseSuccess,
+                                        parsed_message.command,
+                                        parsed_message.variable,
+                                        &parsed_message.data,
+                                    )) {
+                                        Ok(_) => {
+                                            // It was successfull, what else should we do?
+                                        }
+                                        Err(e) => {
+                                            eprintln!("Error writing to serial port: {}", e);
+                                            // Not going to exit, let's just continue for S&Gs.
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        } else if bytes_read > 0 && bytes_read <= 7 {
+            // We could handle this, but we can just ignore and continue for now.
+        }
+
+        // Check if the source mute state has changed.
+        match pa.get_source_mute(PAIdent::Index(config.audio_device_index)) {
+            Ok(m) => {
+                if !mute_state == m {
+                    // Source mute state has changed, send a write request to the device.
+                    match port.write(&ddaa_protocol::create_protocol_buffer(
+                        ddaa_protocol::MessageType::Request,
+                        ddaa_protocol::Command::Write,
+                        0x00,
+                        &[u8::from(mute_state)]
+                    )) {
+                        Ok(_) => {
+                            // Update store mute state to match source's mute state.
+                            mute_state = m;
+                        },
+                        Err(e) => {
+                            // Something bad happended, let's just exit with an error..
+                            eprintln!("Error writing to serial port: {}", e);
+                            exit(1);
+                        }
+                    }
+                }
+            },
+            Err(e) => {
+                // Something bad happended, let's just exit with an error.
+                eprintln!("Error getting mute state: {}", e);
+                exit(1);
+            }
+        }
+
+        // Clear the buffer.
+        received_buffer.clear();
+        received_buffer.resize(64, 0);
+    }
+}
+
+// Respond to a ping message.
+fn respond_to_ping(port: &mut Box<dyn SerialPort>, message: ddaa_protocol::ProtocolMessage) {
+    match port.write(&ddaa_protocol::create_protocol_buffer(
+        ddaa_protocol::MessageType::ResponseSuccess,
+        ddaa_protocol::Command::Ping,
+        message.variable,
+        &message.data,
+    )) {
+        Ok(_) => { },
+        Err(e) => {
+            // Something bad happended, let's just exit with an error.
+            eprintln!("Error writing to serial port: {}", e);
+            exit(1);
+        }
+    };
+}

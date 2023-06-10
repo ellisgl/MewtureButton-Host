@@ -1,13 +1,14 @@
 extern crate serialport;
 
 use std::fs::File;
-use std::time::Duration;
 use std::io::Write;
+use std::process::exit;
+use std::time::Duration;
 use dialoguer::{Select, theme::ColorfulTheme};
 use indicatif::{ProgressBar, ProgressStyle};
-use libpulse_sys::def::pa_port_available_t;
-use pulsectl::controllers::DeviceControl;
-use pulsectl::controllers::SourceController;
+use libpulse_sys::pa_port_available_t;
+use pulser::api::PAIdent;
+use pulser::simple::PulseAudio;
 use serialport::SerialPortType;
 use serde::Serialize;
 
@@ -25,7 +26,8 @@ struct SerialPortItem {
 
 #[derive(Debug, Serialize)]
 struct Config {
-    audio_device_id: u32,
+    audio_device_name: String,
+    audio_device_index: u32,
     serial_port: String
 }
 
@@ -34,27 +36,37 @@ fn main() {
     let mut serial_options: Vec<SerialPortItem> = vec![];
 
     // Create a new spinner.
-    let pb = ProgressBar::new_spinner();
+    let pb: ProgressBar = ProgressBar::new_spinner();
     pb.set_message("Searching for audio devices...");
-    let style = ProgressStyle::default_spinner()
+    let style: ProgressStyle = ProgressStyle::default_spinner()
         .tick_chars("|/-\\-")
         .template("{spinner:.green} {msg}")
-        .unwrap(); // unwraps the Result container to giv the actual type.
+        .unwrap(); // unwraps the Result container to give the actual type.
     pb.set_style(style);
 
     // Start the spinner
     pb.enable_steady_tick(Duration::from_millis(100));
-    // thread::sleep(Duration::new(5, 0));
-    let mut handler = SourceController::create().unwrap();
-    let devices = handler.list_devices().expect("Failed to list devices");
 
-    for dev in devices.clone() {
+
+    // thread::sleep(Duration::new(5, 0));
+    let pa: PulseAudio = PulseAudio::connect(Some("Metwer Button Setup"));
+    let devices: Vec<pulser::api::PASourceInfo> = match pa.get_source_info_list() {
+        Ok(d) => d,
+        Err(e) => {
+            pb.finish_and_clear();
+            eprintln!("Failed to get audio devices: {}", e);
+            exit(1);
+        }
+    };
+
+    for dev in devices {
         if dev.ports.len() == 0 {
+            // No input ports on the device, so let's skip it.
             continue;
         }
 
-        let mut found = false;
-        for port in dev.ports.clone() {
+        let mut found: bool = false;
+        for port in dev.ports {
             if port.available == pa_port_available_t::Unknown || port.available == pa_port_available_t::Yes {
                 found = true;
                 break;
@@ -62,16 +74,15 @@ fn main() {
         }
 
         if found {
-            // available_devices.insert(dev.index, dev.description.unwrap());
             audio_options.push(AudioItem { value: Some(dev.index), display_text: dev.description.unwrap() });
         }
     }
-    audio_options.push(AudioItem { value: None, display_text: "Cancel".to_string() });
 
+    audio_options.push(AudioItem { value: None, display_text: "Cancel".to_string() });
     pb.finish_and_clear();
 
     // Get a list of available serial ports
-    let pb = ProgressBar::new_spinner();
+    let pb: ProgressBar = ProgressBar::new_spinner();
     pb.set_message("Searching for serial devices...");
     let style = ProgressStyle::default_spinner()
         .tick_chars("|/-\\-")
@@ -79,8 +90,8 @@ fn main() {
         .unwrap();
     pb.set_style(style);
     pb.enable_steady_tick(Duration::from_millis(100));
-    // thread::sleep(Duration::new(5, 0));
-    let ports = serialport::available_ports().expect("Failed to enumerate serial ports");
+
+    let ports: Vec<serialport::SerialPortInfo> = serialport::available_ports().expect("Failed to enumerate serial ports");
     let usb_ports: Vec<_> = ports
         .into_iter()
         .filter(|port| match port.port_type {
@@ -92,10 +103,6 @@ fn main() {
         println!("No USB serial ports found");
         return;
     } else {
-        // println!("Available USB serial ports:");
-        // let mut buffer: Vec<u8> = vec![0; 64];
-        // let mut bytes_read: usize;
-
         for port in usb_ports {
             let port_name = port.port_name.clone();
             let serial_port = serialport::new(port_name, 115200)
@@ -109,8 +116,8 @@ fn main() {
 
                     loop {
                         if read_attempts >= 5 {
-                            // Maximum read attempts reached, break the loop
-                            println!("Exceeded maximum read attempts");
+                            // Maximum read attempts reached, break the loop.
+                            eprintln!("Exceeded maximum read attempts");
                             break;
                         }
 
@@ -127,7 +134,6 @@ fn main() {
                             let message = ddaa_protocol::parse_protocol_message(&mut received_buffer);
                             if let Some(parsed_message) = message {
                                 if parsed_message.command == ddaa_protocol::Command::Ping {
-                                    // serial_options.push(SerialPortItem { value: None, display_text: "Cancel".to_string() });
                                     serial_options.push(SerialPortItem { value: Some(port.name().unwrap()), display_text: port.name().unwrap() });
                                     break;
                                 }
@@ -155,8 +161,14 @@ fn main() {
         .unwrap();
 
     let selected_audio_item = &audio_options[audio_selection];
-    let audio_device = match selected_audio_item.value {
-        Some(value) => value,
+    let audio_device = match selected_audio_item.value.to_owned() {
+        Some(value) => match pa.get_source_info(PAIdent::Index(value)) {
+            Ok(info) => info,
+            Err(e) => {
+                eprintln!("Failed to get audio device: {}", e);
+                exit(1);
+            }
+        },
         None => {
             println!("Program exited");
             return;
@@ -179,11 +191,11 @@ fn main() {
     };
 
     let config = Config {
-        audio_device_id: audio_device,
+        audio_device_name: audio_device.name.unwrap(),
+        audio_device_index:audio_device.index,
         serial_port: serial.to_string(),
     };
     let toml = toml::to_string(&config).unwrap();
     let mut file = File::create("config.toml").expect("Could not open file.");
     file.write_all(toml.as_bytes()).expect("Could not write TOML config.");
-    //println!("{} {}", audio_device, serial);
 }

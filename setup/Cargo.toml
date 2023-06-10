@@ -4,11 +4,11 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
-indicatif = "0.17.3"
 dialoguer = "0.10.4"
+indicatif = "0.17.3"
 libpulse-sys = { workspace = true }
-pulsectl-rs = { workspace = true }
-serialport = { workspace = true }
 ddaa_protocol = { workspace = true }
-toml = { workspace = true }
+pulser = { workspace = true }
 serde = { workspace = true }
+serialport = { workspace = true }
+toml = { workspace = true }
