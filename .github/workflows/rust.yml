@@ -21,7 +21,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
         with:
-          name: acheronfail/pulse-rs
+          repository: acheronfail/pulse-rs
           ref: refs/heads/master
       - run: rustup update ${{ matrix.toolchain }} && rustup default ${{ matrix.tollchang }}
       - name: Build and Package
