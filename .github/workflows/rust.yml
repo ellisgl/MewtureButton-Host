@@ -35,6 +35,8 @@ jobs:
 
       - run: rustup update ${{ matrix.toolchain }} && rustup default ${{ matrix.tollchang }}
 
+      - run: cargo install cargo-deb
+
       - name: Build and Package
         run: cargo build --release --verbose && cargo deb -p mewture_daemon
 
