@@ -11,19 +11,32 @@ env:
 
 jobs:
   build:
-
     runs-on: ubuntu-latest
     strategy:
       matrix:
         toolchain:
         - stable
-
     steps:
       - uses: actions/checkout@v3
         with:
           repository: acheronfail/pulse-rs
+
+      - name: Install system dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt update
+          sudo apt-get update
+          sudo apt-get -y install libpulse-dev #package pulse audio dependency
+          while read -r cmd
+          do
+            eval sudo $cmd
+
+          done < <(Rscript -e 'writeLines(remotes::system_requirements("ubuntu", "22.04"))')          
+
       - run: rustup update ${{ matrix.toolchain }} && rustup default ${{ matrix.tollchang }}
+
       - name: Build and Package
         run: cargo build --release --verbose && cargo deb -p mewture_daemon
+
       # - name: Run tests
         # run: cargo test --verbose
