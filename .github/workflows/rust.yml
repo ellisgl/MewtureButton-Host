@@ -39,9 +39,6 @@ jobs:
       - name: Build and Package
         run: cargo build --release --verbose && cargo deb -p mewture_daemon
 
-      - uses: "marvinpinto/action-automatic-releases@latest"
+      - uses: ncipollo/release-action@v1
         with:
-          repo_token: "${{ secrets.GITHUB_TOKEN }}"
-          prerelease: false
-          files: |
-            *.deb
+          artifacts: "*.deb"
