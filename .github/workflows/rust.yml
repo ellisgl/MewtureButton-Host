@@ -26,7 +26,7 @@ jobs:
         run: |
           sudo apt update
           sudo apt-get update
-          sudo apt-get -y install libpulse-dev #package pulse audio dependency
+          sudo apt-get -y install libpulse-dev libudev-dev #External dependencies
           while read -r cmd
           do
             eval sudo $cmd
