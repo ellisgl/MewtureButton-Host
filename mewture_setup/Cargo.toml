@@ -1,5 +1,5 @@
 [package]
-name = "setup"
+name = "mewture_setup"
 version.workspace = true
 edition.workspace = true
 

@@ -1,0 +1,29 @@
+[package]
+name = "mewture_daemon"
+description = "Mewture Button Host Software that uses DDAA (Ding Ding Ack Ack) protocol about the mute status of a source in PulseAudio (linux)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[package.metadata.deb]
+name="muturer_button"
+depends = "$auto, systemd"
+extended-description = "Mewture Button Host Software that uses DDAA (Ding Ding Ack Ack) protocol about the mute status of a source in PulseAudio (linux). See <https://github.com/ellisgl/MewtureButton-Firmware>"
+section = "admin"
+priority = "optional"
+assets = [
+    ["target/release/mewture_daemon", "usr/bin/mewture_daemon", "755"],
+    ["target/release/mewture_setup", "usr/bin/mewture_setup", "755"],
+    ["../debian/mewture_daemon.service", "/lib/systemd/system/mewture_daemon.service", "644"],
+]
+maintainer-scripts = "debian/scripts"
+
+
+[dependencies]
+serialport = { workspace = true }
+ddaa_protocol = { workspace = true }
+toml = { workspace = true }
+serde = { workspace = true }
+pulser = { workspace = true }
+clap = { version = "4.3.4", features = ["derive"] }

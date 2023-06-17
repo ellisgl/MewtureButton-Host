@@ -1,13 +1,15 @@
 [workspace]
 members = [
-    "setup",
-    "daemon"
+    "mewture_setup",
+    "mewture_daemon"
 ]
 
 [workspace.package]
-name = "muturer_button"
-version = "0.1.0"
+name = "mewture_button"
+version = "0.1.1"
 edition = "2021"
+license = "BSD-3-Clause"
+authors = ["EllisGL"]
 
 [workspace.dependencies]
 libc = "0.2.144"

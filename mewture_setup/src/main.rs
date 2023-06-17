@@ -49,7 +49,7 @@ fn main() {
 
 
     // thread::sleep(Duration::new(5, 0));
-    let pa: PulseAudio = PulseAudio::connect(Some("Metwer Button Setup"));
+    let pa: PulseAudio = PulseAudio::connect(Some("Mewture Button Setup"));
     let devices: Vec<pulser::api::PASourceInfo> = match pa.get_source_info_list() {
         Ok(d) => d,
         Err(e) => {
@@ -196,6 +196,6 @@ fn main() {
         serial_port: serial.to_string(),
     };
     let toml = toml::to_string(&config).unwrap();
-    let mut file = File::create("config.toml").expect("Could not open file.");
+    let mut file = File::create("~/.mewture/config.toml").expect("Could not open file.");
     file.write_all(toml.as_bytes()).expect("Could not write TOML config.");
 }

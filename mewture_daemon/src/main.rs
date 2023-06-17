@@ -10,6 +10,7 @@ use std::process::exit;
 use std::time::Duration;
 use toml;
 
+/// Mewture Button Host Software
 #[derive(Parser)]
 #[clap(author, version, about, long_about = None)]
 struct Cli {
@@ -27,7 +28,7 @@ struct Config {
 
 fn main() {
     let cli = Cli::parse();
-    let filename = "config.toml";
+    let filename = "~/.mewture/config.toml";
     let content = match read_to_string(filename) {
         Ok(c) => c,
         Err(_) => {
@@ -45,7 +46,12 @@ fn main() {
     };
 
     if cli.debug {
-        println!("Config: {:?}", config);
+        println!(
+            "Config:\n    Device index: {:?}\n    Device name: {:?}\n    Serial port: {:?}\n",
+            config.audio_device_index,
+            config.audio_device_name,
+            config.serial_port
+        );
     }
 
     let pa = PulseAudio::connect(Some("Mewture Button"));

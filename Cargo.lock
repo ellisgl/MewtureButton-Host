@@ -173,18 +173,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "daemon"
-version = "0.1.0"
-dependencies = [
- "clap",
- "ddaa_protocol",
- "pulser",
- "serde",
- "serialport",
- "toml",
-]
-
-[[package]]
 name = "ddaa_protocol"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -400,6 +388,32 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2dffe52ecf27772e601905b7522cb4ef790d2cc203488bbd0e2fe85fcb74566d"
 
 [[package]]
+name = "mewture_daemon"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "ddaa_protocol",
+ "pulser",
+ "serde",
+ "serialport",
+ "toml",
+]
+
+[[package]]
+name = "mewture_setup"
+version = "0.1.0"
+dependencies = [
+ "ddaa_protocol",
+ "dialoguer",
+ "indicatif",
+ "libpulse-sys",
+ "pulser",
+ "serde",
+ "serialport",
+ "toml",
+]
+
+[[package]]
 name = "nix"
 version = "0.26.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -589,20 +603,6 @@ dependencies = [
  "regex",
  "scopeguard",
  "winapi",
-]
-
-[[package]]
-name = "setup"
-version = "0.1.0"
-dependencies = [
- "ddaa_protocol",
- "dialoguer",
- "indicatif",
- "libpulse-sys",
- "pulser",
- "serde",
- "serialport",
- "toml",
 ]
 
 [[package]]

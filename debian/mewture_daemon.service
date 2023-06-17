@@ -1,0 +1,13 @@
+[Unit]
+AssertPathExists=/usr/bin/mewture_daemon
+
+[Service]
+WorkingDirectory=~
+ExecStart=/usr/bin/mewture_daemon
+Restart=always
+PrivateTmp=true
+NoNewPrivileges=true
+
+[Install]
+Alias=mewture_daemon
+WantedBy=default.target
