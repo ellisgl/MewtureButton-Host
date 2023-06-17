@@ -1,5 +1,6 @@
 extern crate serialport;
 
+use clap::Parser;
 use pulser::api::PAIdent;
 use pulser::simple::PulseAudio;
 use serde::Deserialize;
@@ -9,6 +10,14 @@ use std::process::exit;
 use std::time::Duration;
 use toml;
 
+#[derive(Parser)]
+#[clap(author, version, about, long_about = None)]
+struct Cli {
+    /// Turn on debug output.
+    #[arg(short, long)]
+    debug: bool
+}
+
 #[derive(Debug, Deserialize)]
 struct Config {
     audio_device_name: String,
@@ -17,6 +26,7 @@ struct Config {
 }
 
 fn main() {
+    let cli = Cli::parse();
     let filename = "config.toml";
     let content = match read_to_string(filename) {
         Ok(c) => c,
@@ -33,11 +43,12 @@ fn main() {
             exit(1);
         }
     };
-    println!("{:?}", config.audio_device_name);
-    println!("{:?}", config.audio_device_index);
-    println!("{:?}", config.serial_port);
 
-    let pa = PulseAudio::connect(Some("Metwer Button"));
+    if cli.debug {
+        println!("Config: {:?}", config);
+    }
+
+    let pa = PulseAudio::connect(Some("Mewture Button"));
     match pa.set_default_source(PAIdent::Index(config.audio_device_index)) {
         Ok(_) => {}
         Err(e) => {
@@ -77,7 +88,10 @@ fn main() {
         if bytes_read > 7 {
             // Parse the received data
             let message = ddaa_protocol::parse_protocol_message(&mut received_buffer);
-            println!("{:?}", message);
+            if cli.debug {
+                println!("Incoming message: {:?}", message);
+            }
+
             if let Some(parsed_message) = message {
                 if parsed_message.message_type == ddaa_protocol::MessageType::Request {
                     match parsed_message.command {
@@ -97,7 +111,7 @@ fn main() {
                                 )) {
                                     Ok(_) => {}
                                     Err(_e) => {
-                                        println!("Error writing to serial port");
+                                        eprintln!("Error writing to serial port");
                                     }
                                 }
                             }
@@ -117,7 +131,7 @@ fn main() {
                                                 // We don't have this implemented yet on the hardware side.
                                             }
                                             Err(e) => {
-                                                eprintln!("Error unmuting: {}", e);
+                                                eprintln!("Error un-muting: {}", e);
                                                 exit(1);
                                             }
                                         }
@@ -200,7 +214,7 @@ fn main() {
                                         &parsed_message.data,
                                     )) {
                                         Ok(_) => {
-                                            // It was successfull, what else should we do?
+                                            // It was successful, what else should we do?
                                         }
                                         Err(e) => {
                                             eprintln!("Error writing to serial port: {}", e);
@@ -233,7 +247,7 @@ fn main() {
                             mute_state = m;
                         },
                         Err(e) => {
-                            // Something bad happended, let's just exit with an error..
+                            // Something bad happened, let's just exit with an error..
                             eprintln!("Error writing to serial port: {}", e);
                             exit(1);
                         }
@@ -241,7 +255,7 @@ fn main() {
                 }
             },
             Err(e) => {
-                // Something bad happended, let's just exit with an error.
+                // Something bad happened, let's just exit with an error.
                 eprintln!("Error getting mute state: {}", e);
                 exit(1);
             }
@@ -263,7 +277,7 @@ fn respond_to_ping(port: &mut Box<dyn SerialPort>, message: ddaa_protocol::Proto
     )) {
         Ok(_) => { },
         Err(e) => {
-            // Something bad happended, let's just exit with an error.
+            // Something bad happened, let's just exit with an error.
             eprintln!("Error writing to serial port: {}", e);
             exit(1);
         }
