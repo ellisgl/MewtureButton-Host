@@ -13,17 +13,18 @@ extended-description = "Mewture Button Host Software that uses DDAA (Ding Ding A
 section = "admin"
 priority = "optional"
 assets = [
-    ["target/release/mewture_daemon", "usr/bin/mewture_daemon", "755"],
-    ["target/release/mewture_setup", "usr/bin/mewture_setup", "755"],
-    ["../debian/mewture_daemon.service", "/lib/systemd/system/mewture_daemon.service", "644"],
+    ["target/release/mewture_daemon", "usr/local/bin/mewture_daemon", "755"],
+    ["target/release/mewture_setup", "usr/local/bin/mewture_setup", "755"],
+    ["../debian/mewture_daemon.service", "/usr/lib/systemd/user/mewture_daemon.service", "644"],
 ]
 maintainer-scripts = "debian/scripts"
 
-
 [dependencies]
-serialport = { workspace = true }
+clap = { version = "4.3.4", features = ["derive"] }
 ddaa_protocol = { workspace = true }
+home = { workspace = true }
 toml = { workspace = true }
 serde = { workspace = true }
+serialport = { workspace = true }
 pulser = { workspace = true }
-clap = { version = "4.3.4", features = ["derive"] }
+

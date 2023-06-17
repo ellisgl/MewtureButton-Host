@@ -1,13 +1,34 @@
 #!/bin/sh
 
-# In case this system is running systemd, we make systemd reload the unit files
-# to pick up changes.
-if [ -d /run/systemd/system ] ; then
-	systemctl --system daemon-reload >/dev/null || true
-fi
+## In case this system is running systemd, we make systemd reload the unit files
+## to pick up changes.
+#if [ -d /run/systemd/system ] ; then
+#	systemctl --system daemon-reload >/dev/null || true
+#fi
+#
+#if [ "$1" = "remove" ]; then
+#	if [ -x "/usr/bin/deb-systemd-helper" ]; then
+#		deb-systemd-helper mask mewture_daemon.service >/dev/null
+#	fi
+#fi
 
+# Automatically added by cargo-deb
+if [ -d /run/systemd/system ]; then
+	USER="$(who | head -1 | awk '{print $1;}')"
+	runuser -l $USER -c "XDG_RUNTIME_DIR=/run/user/$(id -u $USER) systemctl --user daemon-reload >/dev/null || true"
+fi
+# End automatically added section
+# Automatically added by cargo-deb
 if [ "$1" = "remove" ]; then
 	if [ -x "/usr/bin/deb-systemd-helper" ]; then
-		deb-systemd-helper mask mewture_daemon.service >/dev/null
+		deb-systemd-helper --user mask mewture_daemon.service >/dev/null || true
 	fi
 fi
+
+if [ "$1" = "purge" ]; then
+	if [ -x "/usr/bin/deb-systemd-helper" ]; then
+		deb-systemd-helper --user purge mewture_daemon.service >/dev/null || true
+		deb-systemd-helper --user unmask mewture_daemon.service >/dev/null || true
+	fi
+fi
+# End automatically added section

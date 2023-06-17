@@ -1,9 +1,9 @@
 [Unit]
-AssertPathExists=/usr/bin/mewture_daemon
+AssertPathExists=/usr/local/bin/mewture_daemon
 
 [Service]
 WorkingDirectory=~
-ExecStart=/usr/bin/mewture_daemon
+ExecStart=/usr/local/bin/mewture_daemon
 Restart=always
 PrivateTmp=true
 NoNewPrivileges=true

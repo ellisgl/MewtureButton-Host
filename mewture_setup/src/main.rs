@@ -1,5 +1,7 @@
 extern crate serialport;
 
+use home;
+use std::fs;
 use std::fs::File;
 use std::io::Write;
 use std::process::exit;
@@ -32,6 +34,22 @@ struct Config {
 }
 
 fn main() {
+    let file_name = match home::home_dir() {
+        Some(path) => {
+            match fs::create_dir(path.join(".mewture")) {
+                Ok(_) => path.join(".mewture/config.toml"),
+                Err(e) => {
+                    eprintln!("Failed to create directory: {:?}", e);
+                    exit(1);
+                }
+            }
+        },
+        None => {
+            eprintln!("Failed to get home directory");
+            exit(1);
+        }
+    };
+
     let mut audio_options: Vec<AudioItem> = vec![];
     let mut serial_options: Vec<SerialPortItem> = vec![];
 
@@ -196,6 +214,7 @@ fn main() {
         serial_port: serial.to_string(),
     };
     let toml = toml::to_string(&config).unwrap();
-    let mut file = File::create("~/.mewture/config.toml").expect("Could not open file.");
+
+    let mut file = File::create(file_name).expect("Could not open file.");
     file.write_all(toml.as_bytes()).expect("Could not write TOML config.");
 }

@@ -1,6 +1,7 @@
 extern crate serialport;
 
 use clap::Parser;
+use home;
 use pulser::api::PAIdent;
 use pulser::simple::PulseAudio;
 use serde::Deserialize;
@@ -28,11 +29,20 @@ struct Config {
 
 fn main() {
     let cli = Cli::parse();
-    let filename = "~/.mewture/config.toml";
-    let content = match read_to_string(filename) {
+    let filename = match home::home_dir() {
+        Some(path) => {
+            path.join(".mewture/config.toml")
+        },
+        None => {
+            eprintln!("Failed to get home directory.");
+            exit(1);
+        }
+    };
+
+    let content = match read_to_string(&filename) {
         Ok(c) => c,
         Err(_) => {
-            eprintln!("Could not read file `{}`", filename);
+            eprintln!("Could not read file `{}`", filename.display());
             exit(1);
         }
     };
@@ -40,7 +50,7 @@ fn main() {
     let config: Config = match toml::from_str(&content) {
         Ok(c) => c,
         Err(e) => {
-            eprintln!("Unable to load data from `{}`. Error: {}", filename, e);
+            eprintln!("Unable to load data from `{}`. Error: {:?}", filename.display(), e);
             exit(1);
         }
     };
@@ -58,7 +68,7 @@ fn main() {
     match pa.set_default_source(PAIdent::Index(config.audio_device_index)) {
         Ok(_) => {}
         Err(e) => {
-            eprintln!("Error setting default source: {}", e);
+            eprintln!("Error setting default source: {:?}", e);
             exit(1)
         }
     };
