@@ -2,15 +2,14 @@ name: Rust
 
 on:
   push:
-    branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
+    tags:
+      - "v*"
 
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  build:
+  tagg-release:
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -40,5 +39,9 @@ jobs:
       - name: Build and Package
         run: cargo build --release --verbose && cargo deb -p mewture_daemon
 
-      # - name: Run tests
-        # run: cargo test --verbose
+      - uses: "marvinpinto/action-automatic-releases@latest"
+        with:
+          repo_token: "${{ secrets.GITHUB_TOKEN }}"
+          prerelease: false
+          files: |
+            *.deb
