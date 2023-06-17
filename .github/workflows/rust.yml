@@ -18,6 +18,7 @@ jobs:
     steps:
       - uses: actions/checkout@v3
         with:
+          token: ${{ secrets.RELEASE_TOKEN }}
           submodules: recursive
 
       - name: Install system dependencies
@@ -39,6 +40,8 @@ jobs:
       - name: Build and Package
         run: cargo build --release --verbose && cargo deb -p mewture_daemon
 
-      - uses: ncipollo/release-action@v1
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
         with:
-          artifacts: "*.deb"
+          files: /home/runner/work/MewtureButton-Host/MewtureButton-Host/target/debian/muturer_button_${{ github.event.release.tag_name }]}_amd64.deb
