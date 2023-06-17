@@ -22,7 +22,6 @@ jobs:
       - uses: actions/checkout@v3
         with:
           repository: acheronfail/pulse-rs
-          ref: refs/heads/master
       - run: rustup update ${{ matrix.toolchain }} && rustup default ${{ matrix.tollchang }}
       - name: Build and Package
         run: cargo build --release --verbose && cargo deb -p mewture_daemon
