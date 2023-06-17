@@ -1,0 +1,18 @@
+name: AMD64 Debian Build
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:   
+      - uses: actions/checkout@master
+      - name: Deb Build
+        uses: ebbflow-io/cargo-deb-amd64-ubuntu@1.0
