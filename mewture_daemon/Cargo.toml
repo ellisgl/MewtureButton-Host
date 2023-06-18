@@ -23,6 +23,7 @@ maintainer-scripts = "debian/scripts"
 clap = { version = "4.3.4", features = ["derive"] }
 ddaa_protocol = { workspace = true }
 home = { workspace = true }
+mewture_shared = { workspace = true }
 toml = { workspace = true }
 serde = { workspace = true }
 serialport = { workspace = true }

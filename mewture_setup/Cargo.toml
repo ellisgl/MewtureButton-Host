@@ -9,6 +9,7 @@ indicatif = "0.17.3"
 home = { workspace = true }
 ddaa_protocol = { workspace = true }
 libpulse-sys = { workspace = true }
+mewture_shared = { workspace = true }
 pulser = { workspace = true }
 serde = { workspace = true }
 serialport = { workspace = true }

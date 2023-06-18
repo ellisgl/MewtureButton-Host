@@ -398,11 +398,12 @@ checksum = "2dffe52ecf27772e601905b7522cb4ef790d2cc203488bbd0e2fe85fcb74566d"
 
 [[package]]
 name = "mewture_daemon"
-version = "0.1.4"
+version = "0.1.13"
 dependencies = [
  "clap",
  "ddaa_protocol",
  "home",
+ "mewture_shared",
  "pulser",
  "serde",
  "serialport",
@@ -411,17 +412,25 @@ dependencies = [
 
 [[package]]
 name = "mewture_setup"
-version = "0.1.4"
+version = "0.1.13"
 dependencies = [
  "ddaa_protocol",
  "dialoguer",
  "home",
  "indicatif",
  "libpulse-sys",
+ "mewture_shared",
  "pulser",
  "serde",
  "serialport",
  "toml",
+]
+
+[[package]]
+name = "mewture_shared"
+version = "0.1.13"
+dependencies = [
+ "serde",
 ]
 
 [[package]]

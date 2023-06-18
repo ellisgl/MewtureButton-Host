@@ -9,10 +9,10 @@ use std::time::Duration;
 use dialoguer::{Select, theme::ColorfulTheme};
 use indicatif::{ProgressBar, ProgressStyle};
 use libpulse_sys::pa_port_available_t;
+use mewture_shared;
 use pulser::api::PAIdent;
 use pulser::simple::PulseAudio;
 use serialport::SerialPortType;
-use serde::Serialize;
 
 #[derive(Debug)]
 struct AudioItem {
@@ -24,13 +24,6 @@ struct AudioItem {
 struct SerialPortItem {
     value: Option<String>,
     display_text: String,
-}
-
-#[derive(Debug, Serialize)]
-struct Config {
-    audio_device_name: String,
-    audio_device_index: u32,
-    serial_port: String
 }
 
 fn main() {
@@ -208,7 +201,7 @@ fn main() {
         }
     };
 
-    let config = Config {
+    let config = mewture_shared::Config {
         audio_device_name: audio_device.name.unwrap(),
         audio_device_index:audio_device.index,
         serial_port: serial.to_string(),

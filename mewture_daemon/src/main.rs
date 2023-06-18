@@ -2,9 +2,9 @@ extern crate serialport;
 
 use clap::Parser;
 use home;
+use mewture_shared;
 use pulser::api::PAIdent;
 use pulser::simple::PulseAudio;
-use serde::Deserialize;
 use serialport::SerialPort;
 use std::fs::read_to_string;
 use std::process::exit;
@@ -18,13 +18,6 @@ struct Cli {
     /// Turn on debug output.
     #[arg(short, long)]
     debug: bool
-}
-
-#[derive(Debug, Deserialize)]
-struct Config {
-    audio_device_name: String,
-    audio_device_index: u32,
-    serial_port: String,
 }
 
 fn main() {
@@ -47,7 +40,7 @@ fn main() {
         }
     };
 
-    let config: Config = match toml::from_str(&content) {
+    let config: mewture_shared::Config = match toml::from_str(&content) {
         Ok(c) => c,
         Err(e) => {
             eprintln!("Unable to load data from `{}`. Error: {:?}", filename.display(), e);
