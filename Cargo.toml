@@ -6,7 +6,7 @@ members = [
 
 [workspace.package]
 name = "mewture_button"
-version = "0.1.12"
+version = "0.1.13"
 edition = "2021"
 license = "BSD-3-Clause"
 authors = ["EllisGL"]
