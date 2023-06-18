@@ -7,7 +7,7 @@ license.workspace = true
 authors.workspace = true
 
 [package.metadata.deb]
-name="muturer_button"
+name="mewture_button"
 depends = "$auto, systemd"
 extended-description = "Mewture Button Host Software that uses DDAA (Ding Ding Ack Ack) protocol about the mute status of a source in PulseAudio (linux). See <https://github.com/ellisgl/MewtureButton-Firmware>"
 section = "admin"
