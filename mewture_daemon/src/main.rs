@@ -200,36 +200,10 @@ fn main() {
                                 }
                                 // Data for mute variable is invalid.
                                 if parsed_message.data[0] > 0x02 {
-                                    match port.write(&ddaa_protocol::create_protocol_buffer(
-                                        ddaa_protocol::MessageType::ResponseError,
-                                        parsed_message.command,
-                                        parsed_message.variable,
-                                        &parsed_message.data,
-                                    )) {
-                                        Ok(_) => {
-                                            // We could respond with an error, but it's not implemented in firmware.
-                                        }
-                                        Err(e) => {
-                                            eprintln!("Error writing to serial port: {}", e);
-                                            // Not going to exit, let's just continue for S&Gs.
-                                        }
-                                    }
+                                    write_response_to_port(&mut port, ddaa_protocol::MessageType::ResponseError, parsed_message);
                                 } else {
                                     // We have a valid request, respond with success.
-                                    match port.write(&ddaa_protocol::create_protocol_buffer(
-                                        ddaa_protocol::MessageType::ResponseSuccess,
-                                        parsed_message.command,
-                                        parsed_message.variable,
-                                        &parsed_message.data,
-                                    )) {
-                                        Ok(_) => {
-                                            // It was successful, what else should we do?
-                                        }
-                                        Err(e) => {
-                                            eprintln!("Error writing to serial port: {}", e);
-                                            // Not going to exit, let's just continue for S&Gs.
-                                        }
-                                    }
+                                    write_response_to_port(&mut port, ddaa_protocol::MessageType::ResponseSuccess, parsed_message);
                                 }
                             }
                         }
@@ -291,4 +265,25 @@ fn respond_to_ping(port: &mut Box<dyn SerialPort>, message: ddaa_protocol::Proto
             exit(1);
         }
     };
+}
+
+fn write_response_to_port(
+    port: &mut Box<dyn SerialPort>,
+    message_type: ddaa_protocol::MessageType,
+    parsed_message: ddaa_protocol::ProtocolMessage
+) {
+    match port.write(&ddaa_protocol::create_protocol_buffer(
+        message_type,
+        parsed_message.command,
+        parsed_message.variable,
+        &parsed_message.data,
+    )) {
+        Ok(_) => {
+            // We could respond with an error, but it's not implemented in firmware.
+        }
+        Err(e) => {
+            eprintln!("Error writing to serial port: {}", e);
+            // Not going to exit, let's just continue for S&Gs.
+        }
+    }
 }
