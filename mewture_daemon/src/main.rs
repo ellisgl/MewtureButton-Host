@@ -5,14 +5,16 @@ use clap::Parser;
 use ddaa_protocol::{MessageType, ProtocolMessage};
 use home;
 use mewture_shared;
-use pulser::api::PAIdent;
-use pulser::simple::PulseAudio;
-use serialport::SerialPort;
 use std::fs::read_to_string;
 use std::path::PathBuf;
 use std::process::exit;
-use std::time::Duration;
 use toml;
+
+use crate::pulseaudio_handler::PulseAudioHandler;
+use crate::serial_handler::SerialHandler;
+
+mod serial_handler;
+mod pulseaudio_handler;
 
 /// Mewture Button Host Software
 #[derive(Parser)]
@@ -45,30 +47,30 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
 
     // Setup PulseAudio.
-    let mut pa = setup_pulseaudio(&config)?;
+    let mut pulseaudio = PulseAudioHandler::new(config.audio_device_index)?;
 
     // Setup the serial port.
-    let mut port = setup_serial_port(&config)?;
+    // let mut port = setup_serial_port(&config)?;
+    let mut port = SerialHandler::new(&config.serial_port, 115200)?;
 
     // Get the current mute state.
-    let mut current_mute_state = get_source_mute(&pa, &config)?;
+    let mut current_mute_state = pulseaudio.get_mute_state()?;
     if cli.debug {
         // Print the current mute state if debug is enabled.
         println!("Initial mute state: {:?}", current_mute_state);
     }
 
-    run(config, &mut pa, &mut port, &mut current_mute_state, cli.debug)
+    run(&mut pulseaudio, &mut port, &mut current_mute_state, cli.debug)
 }
 
 /// Check if the source's mute state has changed.
 fn check_for_mute_state_change(
-    config: &mewture_shared::Config,
-    pa: &mut PulseAudio,
-    port: &mut Box<dyn SerialPort>,
+    pulseaudio: &mut PulseAudioHandler,
+    port: &mut SerialHandler,
     current_mute_state: &mut bool, debug: bool
 ) -> Result<(), Box<dyn Error>> {
     // Check if the source mute state has changed.
-    let new_mute_state = get_source_mute(&pa, &config)?;
+    let new_mute_state = pulseaudio.get_mute_state()?;
     let mut message = ProtocolMessage {
         message_type: MessageType::Request,
         command: ddaa_protocol::Command::Write,
@@ -124,65 +126,9 @@ fn get_config(path: PathBuf) -> Result<mewture_shared::Config, Box<dyn Error>> {
     }
 }
 
-/// Get the source mute state.
-fn get_source_mute(pa: &PulseAudio, config: &mewture_shared::Config) -> Result<bool, Box<dyn Error>> {
-    match pa.get_source_mute(PAIdent::Index(config.audio_device_index)) {
-        Ok(m) => Ok(m),
-        Err(e) => {
-            eprintln!("Error getting mute state: {}", e);
-            Err(e.into())
-        }
-    }
-}
-
-/// Set the source mute state as the inverted value of it's current state.
-fn invert_source_mute(
-    pa: &mut PulseAudio,
-    config: &mewture_shared::Config,
-    port: &mut Box<dyn SerialPort>,
-    parsed_message: &ProtocolMessage,
-    mute_state: bool,
-    debug: bool
-) -> Result<(), Box<dyn Error>> {
-    if debug {
-        println!("Inverting mute state from {:?} to {:?}", mute_state, !mute_state);
-    }
-
-    match set_source_mute(pa, config, !mute_state, debug) {
-        Ok(_) => {
-            // Responds with success message.
-            let buffer = &ddaa_protocol::create_protocol_buffer(
-                MessageType::ResponseSuccess,
-                ddaa_protocol::Command::Write,
-                parsed_message.variable,
-                &[u8::from(!mute_state)]
-            );
-            match port.write(
-                buffer,
-            ) {
-                Ok(size) => {
-                    if debug {
-                        println!("set_source_mute responded with {:?} bytes: {:?}", size, buffer);
-                    }
-
-                    Ok(())
-                },
-                Err(e) => {
-                    eprintln!("Error writing to serial port: {}", e);
-                    Err(e.into())
-                }
-            }
-        },
-        Err(e) => {
-            eprintln!("Error inverting mute: {}", e);
-            Err(e.into())
-        }
-    }
-}
-
 /// Handle a read request.
 fn handle_read_request(
-    port: &mut Box<dyn SerialPort>,
+    port: &mut SerialHandler,
     parsed_message: ProtocolMessage,
     current_mute_state: &bool,
     debug: bool
@@ -224,9 +170,8 @@ fn handle_read_request(
 
 /// Handle a request.
 fn handle_request(
-    config: &mewture_shared::Config,
-    pa: &mut PulseAudio,
-    port: &mut Box<dyn SerialPort>,
+    pulseaudio: &mut PulseAudioHandler,
+    port: &mut SerialHandler,
     parsed_message: ProtocolMessage,
     current_mute_state: &mut bool,
     debug: bool
@@ -250,7 +195,7 @@ fn handle_request(
         }
         ddaa_protocol::Command::Write => {
             // Received write request.
-            handle_write_request(config, pa, port, parsed_message, current_mute_state, debug)?
+            handle_write_request(pulseaudio, port, parsed_message, current_mute_state, debug)?
         }
     }
 
@@ -259,9 +204,8 @@ fn handle_request(
 
 /// Handle incoming serial data.
 fn handle_serial_data(
-    config: &mewture_shared::Config,
-    port: &mut Box<dyn SerialPort>,
-    pa: &mut PulseAudio,
+    port: &mut SerialHandler,
+    pulseaudio: &mut PulseAudioHandler,
     received_buffer: &mut [u8],
     current_mute_state: &mut bool,
     debug: bool
@@ -286,8 +230,7 @@ fn handle_serial_data(
                 }
 
                 handle_request(
-                    &config,
-                    pa,
+                    pulseaudio,
                     port,
                     parsed_message,
                     current_mute_state,
@@ -304,9 +247,8 @@ fn handle_serial_data(
 
 /// Handle a write request.
 fn handle_write_request(
-    config: &mewture_shared::Config,
-    pa: &mut PulseAudio,
-    port: &mut Box<dyn SerialPort>,
+    pulseaudio: &mut PulseAudioHandler,
+    port: &mut SerialHandler,
     parsed_message: ProtocolMessage,
     current_mute_state: &mut bool,
     debug: bool
@@ -323,22 +265,22 @@ fn handle_write_request(
         match parsed_message.data[0] {
             0x00 => {
                 // Received mute request.
-                // Set source mute state to true.
-                if debug {
-                    println!("Received mute set to true request");
-                }
-
-                set_source_mute(pa, &config, false, debug)?;
-                write_message_to_port(port, MessageType::ResponseSuccess, parsed_message, debug)?;
-            }
-            0x01 => {
-                // Received unmute request.
                 // Set source mute state to false.
                 if debug {
                     println!("Received mute set to false request");
                 }
 
-                set_source_mute(pa, &config, true, debug)?;
+                pulseaudio.set_mute_state(false)?;
+                write_message_to_port(port, MessageType::ResponseSuccess, parsed_message, debug)?;
+            }
+            0x01 => {
+                // Received unmute request.
+                // Set source mute state to true.
+                if debug {
+                    println!("Received mute set to true request");
+                }
+
+                pulseaudio.set_mute_state(true)?;
                 write_message_to_port(port, MessageType::ResponseSuccess, parsed_message, debug)?;
             }
             0x02 => {
@@ -347,7 +289,7 @@ fn handle_write_request(
                     println!("Received mute set to invert request");
                 }
 
-                invert_source_mute(pa, &config, port, &parsed_message, *current_mute_state, debug)?;
+                pulseaudio.set_mute_state(!*current_mute_state)?;
                 write_message_to_port(port, MessageType::ResponseSuccess, parsed_message, debug)?;
 
             }
@@ -363,7 +305,7 @@ fn handle_write_request(
 }
 
 /// Respond to a ping message.
-fn respond_to_ping(port: &mut Box<dyn SerialPort>, message: ProtocolMessage) {
+fn respond_to_ping(port: &mut SerialHandler, message: ProtocolMessage) {
     match port.write(&ddaa_protocol::create_protocol_buffer(
         MessageType::ResponseSuccess,
         ddaa_protocol::Command::Ping,
@@ -381,19 +323,18 @@ fn respond_to_ping(port: &mut Box<dyn SerialPort>, message: ProtocolMessage) {
 
 /// The loop that does all the things for the daemon.
 fn run(
-    config: mewture_shared::Config,
-    pa: &mut PulseAudio,
-    port: &mut Box<dyn SerialPort>,
+    pulseaudio: &mut PulseAudioHandler,
+    port: &mut SerialHandler,
     current_mute_state: &mut bool,
     debug: bool
 ) -> Result<(), Box<dyn Error>> {
     let mut received_buffer: Vec<u8> = vec![0; 64];
     loop {
         // Handle incoming serial data.
-        handle_serial_data(&config, port, pa, &mut received_buffer, current_mute_state, debug)?;
+        handle_serial_data(port, pulseaudio, &mut received_buffer, current_mute_state, debug)?;
 
         // Check if the source mute state has changed.
-        check_for_mute_state_change(&config, pa, port, current_mute_state, debug)?;
+        check_for_mute_state_change(pulseaudio, port, current_mute_state, debug)?;
 
         // Clear the buffer.
         received_buffer.clear();
@@ -401,70 +342,9 @@ fn run(
     }
 }
 
-/// Set the source mute state.
-fn set_source_mute(
-    pa: &PulseAudio,
-    config: &mewture_shared::Config,
-    mute_state: bool,
-    debug: bool
-) -> Result<(), Box<dyn Error>> {
-    if debug {
-        println!("Setting source mute state to {:?}", mute_state);
-    }
-
-    match pa.set_source_mute(PAIdent::Index(config.audio_device_index), mute_state) {
-        Ok(res) => {
-            if debug {
-                println!("pa.set_source_mute responded with {:?}", res);
-            }
-
-            Ok(())
-        },
-        Err(e) => {
-            eprintln!("Error setting mute state: {}", e);
-            Err(e.into())
-        }
-    }
-}
-
-/// Set the default source device in PulseAudio.
-fn setup_default_source(pa: &PulseAudio, config: &mewture_shared::Config) -> Result<(), Box<dyn Error>> {
-    match pa.set_default_source(PAIdent::Index(config.audio_device_index)) {
-        Ok(_) => Ok(()),
-        Err(e) => {
-            eprintln!("Error setting default source: {:?}", e);
-            Err(e.into())
-        }
-    }
-}
-
-/// Connect and setup the source device.
-fn setup_pulseaudio(config: &mewture_shared::Config) -> Result<PulseAudio, Box<dyn Error>> {
-    let pa = PulseAudio::connect(Some("Mewture Button"));
-    setup_default_source(&pa, config)?;
-
-    Ok(pa)
-}
-
-/// Open and configure the serial port.
-fn setup_serial_port(config: &mewture_shared::Config) -> Result<Box<dyn SerialPort>, Box<dyn Error>> {
-    // Check for the serial device.
-    let serial_port = serialport::new(&config.serial_port, 115200)
-        .timeout(Duration::from_millis(300))
-        .open();
-
-    match serial_port {
-        Ok(p) => Ok(p),
-        Err(e) => {
-            eprintln!("Error reading from serial port: {}", e);
-            Err(e.into())
-        }
-    }
-}
-
 /// Write a message to the serial port.
 fn write_message_to_port(
-    port: &mut Box<dyn SerialPort>,
+    port: &mut SerialHandler,
     message_type: MessageType,
     parsed_message: ProtocolMessage,
     debug: bool
