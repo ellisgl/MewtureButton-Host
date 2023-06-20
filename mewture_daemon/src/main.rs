@@ -257,6 +257,51 @@ fn handle_request(
     Ok(())
 }
 
+/// Handle incoming serial data.
+fn handle_searial_data(
+    config: &mewture_shared::Config,
+    port: &mut Box<dyn SerialPort>,
+    pa: &mut PulseAudio,
+    received_buffer: &mut [u8],
+    current_mute_state: &mut bool,
+    debug: bool
+) -> Result<(), Box<dyn Error>> {
+    let bytes_read = match port.read(received_buffer) {
+        Ok(bytes_read) => bytes_read,
+        Err(_e) => { 0 }
+    };
+
+    if bytes_read > 7 {
+        // Parse the received data.
+        let message = ddaa_protocol::parse_protocol_message(received_buffer.to_vec().as_mut());
+        if debug {
+            // Print the incoming message if debug is enabled.
+            println!("Incoming message: {:?}", message);
+        }
+
+        if let Some(parsed_message) = message {
+            if parsed_message.message_type == MessageType::Request {
+                if debug {
+                    println!("Received request: {:?}", parsed_message);
+                }
+
+                handle_request(
+                    &config,
+                    pa,
+                    port,
+                    parsed_message,
+                    current_mute_state,
+                    debug
+                )?
+            }
+        }
+    } else if bytes_read > 0 && bytes_read <= 7 {
+        // We could handle this, but we can just ignore and continue for now.
+    }
+
+    Ok(())
+}
+
 /// Handle a write request.
 fn handle_write_request(
     config: &mewture_shared::Config,
@@ -344,38 +389,8 @@ fn run(
 ) -> Result<(), Box<dyn Error>> {
     let mut received_buffer: Vec<u8> = vec![0; 64];
     loop {
-        let bytes_read = match port.read(&mut received_buffer) {
-            Ok(bytes_read) => bytes_read,
-            Err(_e) => { 0 }
-        };
-
-        if bytes_read > 7 {
-            // Parse the received data.
-            let message = ddaa_protocol::parse_protocol_message(&mut received_buffer);
-            if debug {
-                // Print the incoming message if debug is enabled.
-                println!("Incoming message: {:?}", message);
-            }
-
-            if let Some(parsed_message) = message {
-                if parsed_message.message_type == MessageType::Request {
-                    if debug {
-                        println!("Received request: {:?}", parsed_message);
-                    }
-
-                    handle_request(
-                        &config,
-                        pa,
-                        port,
-                        parsed_message,
-                        current_mute_state,
-                        debug
-                    )?
-                }
-            }
-        } else if bytes_read > 0 && bytes_read <= 7 {
-            // We could handle this, but we can just ignore and continue for now.
-        }
+        // Handle incoming serial data.
+        handle_searial_data(&config, port, pa, &mut received_buffer, current_mute_state, debug)?;
 
         // Check if the source mute state has changed.
         check_for_mute_state_change(&config, pa, port, current_mute_state, debug)?;
