@@ -258,7 +258,7 @@ fn handle_request(
 }
 
 /// Handle incoming serial data.
-fn handle_searial_data(
+fn handle_serial_data(
     config: &mewture_shared::Config,
     port: &mut Box<dyn SerialPort>,
     pa: &mut PulseAudio,
@@ -390,7 +390,7 @@ fn run(
     let mut received_buffer: Vec<u8> = vec![0; 64];
     loop {
         // Handle incoming serial data.
-        handle_searial_data(&config, port, pa, &mut received_buffer, current_mute_state, debug)?;
+        handle_serial_data(&config, port, pa, &mut received_buffer, current_mute_state, debug)?;
 
         // Check if the source mute state has changed.
         check_for_mute_state_change(&config, pa, port, current_mute_state, debug)?;
