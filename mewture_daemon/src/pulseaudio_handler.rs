@@ -10,13 +10,13 @@ pub struct PulseAudioHandler {
 impl PulseAudioHandler {
     // Initialize PulseAudio.
     // I know doing logic in a "constructor" is a bad idea, but I'm lazy.
-    pub fn new(device_idx: u32) -> Result<Self, Box<dyn Error>> {
+    pub fn new(pulseaudio: PulseAudio, device_idx: u32) -> Result<Self, Box<dyn Error>> {
         let device_index = {
             let tmp = &mut PAIdent::Index(device_idx);
             tmp.clone()
         };
 
-        let pulseaudio = PulseAudio::connect(Some("Mewture Button"));
+        let pulseaudio = pulseaudio;
         pulseaudio.set_default_source(device_index.clone())?;
 
         Ok(Self { device_index, pulseaudio })

@@ -5,6 +5,7 @@ use clap::Parser;
 use ddaa_protocol::{MessageType, ProtocolMessage};
 use home;
 use mewture_shared;
+use pulser::simple::PulseAudio;
 use std::fs::read_to_string;
 use std::path::PathBuf;
 use std::process::exit;
@@ -47,7 +48,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
 
     // Setup PulseAudio.
-    let mut pulseaudio = PulseAudioHandler::new(config.audio_device_index)?;
+    let mut pulseaudio = PulseAudioHandler::new(
+        PulseAudio::connect(Some("Mewture Button")),
+        config.audio_device_index
+    )?;
 
     // Setup the serial port.
     // let mut port = setup_serial_port(&config)?;
