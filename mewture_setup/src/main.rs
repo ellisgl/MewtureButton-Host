@@ -131,7 +131,6 @@ fn main() {
                 SerialPortType::UsbPort(p) => {
                      match p.serial_number {
                         Some(sn) => {
-                            println!("Serial number: {:?}", sn);
                             match glob(&format!("/dev/serial/by-id/*{}*", sn))
                                 .expect("Glob error")
                                 .next() {
@@ -164,7 +163,6 @@ fn main() {
                 }
             };
 
-            println!("port_name: {:?}", port_name);
             let serial_port = serialport::new(port_name, 115200)
                 .timeout(Duration::from_secs(6))
                 .open();
