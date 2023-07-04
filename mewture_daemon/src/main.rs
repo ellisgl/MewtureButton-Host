@@ -26,7 +26,9 @@ struct Cli {
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
+    // Parse the command line arguments.
     let cli = Cli::parse();
+    // Get the configuration.
     let filename = match home::home_dir() {
         Some(path) => {
             path.join(".mewture/config.toml")
@@ -36,8 +38,9 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
     };
     let config: mewture_shared::Config = get_config(filename)?;
+
+    // Print the configuration if debug is enabled.
     if cli.debug {
-        // Print the configuration if debug is enabled.
         println!(
             "Config:\n    Device index: {:?}\n    Device name: {:?}\n    Serial port: {:?}\n",
             config.audio_device_index,
@@ -50,7 +53,6 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut pulseaudio = PulseAudioHandler::new(config.audio_device_index)?;
 
     // Setup the serial port.
-    // let mut port = setup_serial_port(&config)?;
     let mut port = SerialHandler::new(&config.serial_port, 115200)?;
 
     // Get the current mute state.
@@ -67,18 +69,24 @@ fn main() -> Result<(), Box<dyn Error>> {
 fn check_for_mute_state_change(
     pulseaudio: &mut PulseAudioHandler,
     port: &mut SerialHandler,
-    current_mute_state: &mut bool, debug: bool
+    current_mute_state: &mut bool,
+    debug: bool
 ) -> Result<(), Box<dyn Error>> {
     // Check if the source mute state has changed.
     let new_mute_state = pulseaudio.get_mute_state()?;
-    let mut message = ProtocolMessage {
-        message_type: MessageType::Request,
-        command: ddaa_protocol::Command::Write,
-        variable: 0x00,
-        data: vec![0x00]
-    };
 
     if new_mute_state != *current_mute_state {
+        if debug {
+            println!("Mute state changed from {:?} to {:?}", current_mute_state, new_mute_state);
+        }
+
+        let mut message = ProtocolMessage {
+            message_type: MessageType::Request,
+            command: ddaa_protocol::Command::Write,
+            variable: 0x00,
+            data: vec![0x00]
+        };
+
         message.data[0] = u8::from(new_mute_state);
         return match write_message_to_port(
             port,
