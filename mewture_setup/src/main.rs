@@ -27,9 +27,10 @@ struct SerialPortItem {
 }
 
 fn main() {
+    // Create the ~/.mewture directory if it doesn't exist, and create the config file path.
     let file_name = match home::home_dir() {
         Some(path) => {
-            match fs::create_dir(path.join(".mewture")) {
+            match fs::create_dir_all(path.join(".mewture")) {
                 Ok(_) => path.join(".mewture/config.toml"),
                 Err(e) => {
                     eprintln!("Failed to create directory: {:?}", e);
@@ -58,8 +59,7 @@ fn main() {
     // Start the spinner
     pb.enable_steady_tick(Duration::from_millis(100));
 
-
-    // thread::sleep(Duration::new(5, 0));
+    // Get a list of available audio devices.
     let pa: PulseAudio = PulseAudio::connect(Some("Mewture Button Setup"));
     let devices: Vec<pulser::api::PASourceInfo> = match pa.get_source_info_list() {
         Ok(d) => d,
@@ -92,7 +92,7 @@ fn main() {
     audio_options.push(AudioItem { value: None, display_text: "Cancel".to_string() });
     pb.finish_and_clear();
 
-    // Get a list of available serial ports
+    // Get a list of available serial ports.
     let pb: ProgressBar = ProgressBar::new_spinner();
     pb.set_message("Searching for serial devices...");
     let style = ProgressStyle::default_spinner()
@@ -165,6 +165,7 @@ fn main() {
 
     pb.finish_and_clear();
 
+    // Create a selection prompt for the audio devices.
     let audio_selection = Select::with_theme(&ColorfulTheme::default())
         .with_prompt("Select an audio device")
         .items(&audio_options.iter().map(|item| item.display_text.as_str()).collect::<Vec<_>>())
@@ -186,6 +187,7 @@ fn main() {
         }
     };
 
+    // Create a selection prompt for the serial ports.
     let serial_selection = Select::with_theme(&ColorfulTheme::default())
         .with_prompt("Select a serial port")
         .items(&serial_options.iter().map(|item| item.display_text.as_str()).collect::<Vec<_>>())
@@ -201,6 +203,7 @@ fn main() {
         }
     };
 
+    // Create the content for the config file.
     let config = mewture_shared::Config {
         audio_device_name: audio_device.name.unwrap(),
         audio_device_index:audio_device.index,
@@ -208,6 +211,7 @@ fn main() {
     };
     let toml = toml::to_string(&config).unwrap();
 
+    // Write the config file.
     let mut file = File::create(file_name).expect("Could not open file.");
     file.write_all(toml.as_bytes()).expect("Could not write TOML config.");
 }
