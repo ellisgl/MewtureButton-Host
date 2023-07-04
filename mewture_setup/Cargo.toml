@@ -5,6 +5,7 @@ edition.workspace = true
 
 [dependencies]
 dialoguer = "0.10.4"
+glob = "0.3.1"
 indicatif = "0.17.3"
 home = { workspace = true }
 ddaa_protocol = { workspace = true }

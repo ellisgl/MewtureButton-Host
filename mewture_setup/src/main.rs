@@ -1,6 +1,7 @@
 extern crate serialport;
 
 use home;
+use glob::glob;
 use std::fs;
 use std::fs::File;
 use std::io::Write;
@@ -56,7 +57,7 @@ fn main() {
         .unwrap(); // unwraps the Result container to give the actual type.
     pb.set_style(style);
 
-    // Start the spinner
+    // Start the spinner.
     pb.enable_steady_tick(Duration::from_millis(100));
 
     // Get a list of available audio devices.
@@ -78,14 +79,22 @@ fn main() {
 
         let mut found: bool = false;
         for port in dev.ports {
-            if port.available == pa_port_available_t::Unknown || port.available == pa_port_available_t::Yes {
+            if
+                port.available == pa_port_available_t::Unknown ||
+                port.available == pa_port_available_t::Yes
+            {
                 found = true;
                 break;
             }
         }
 
         if found {
-            audio_options.push(AudioItem { value: Some(dev.index), display_text: dev.description.unwrap() });
+            audio_options.push(
+                AudioItem {
+                    value: Some(dev.index),
+                    display_text: dev.description.unwrap()
+                }
+            );
         }
     }
 
@@ -102,11 +111,14 @@ fn main() {
     pb.set_style(style);
     pb.enable_steady_tick(Duration::from_millis(100));
 
-    let ports: Vec<serialport::SerialPortInfo> = serialport::available_ports().expect("Failed to enumerate serial ports");
+    let ports: Vec<serialport::SerialPortInfo> =
+        serialport::available_ports().expect("Failed to enumerate serial ports");
     let usb_ports: Vec<_> = ports
         .into_iter()
         .filter(|port| match port.port_type {
-            SerialPortType::UsbPort(_) => true,
+            SerialPortType::UsbPort(_) => {
+                true
+            },
             _ => false,
         })
         .collect();
@@ -115,7 +127,44 @@ fn main() {
         return;
     } else {
         for port in usb_ports {
-            let port_name = port.port_name.clone();
+            let port_name: String = match port.port_type {
+                SerialPortType::UsbPort(p) => {
+                     match p.serial_number {
+                        Some(sn) => {
+                            println!("Serial number: {:?}", sn);
+                            match glob(&format!("/dev/serial/by-id/*{}*", sn))
+                                .expect("Glob error")
+                                .next() {
+                                Some(path) => {
+                                   match path {
+                                        Ok(p) => {
+                                            // We have a matching serial number, return it.
+                                            p.display().to_string()
+                                        },
+                                        _ => {
+                                            // No matching directory, return the port name.
+                                            port.port_name.clone()
+                                        }
+                                    }
+                                },
+                                None => {
+                                    // No matching directory, return the port name.
+                                    port.port_name.clone()
+                                }
+                            }
+                        },
+                        None => {
+                            // No serial number, just use it's port name.
+                            port.port_name.clone()
+                        }
+                    }
+                },
+                _ => {
+                    continue;
+                }
+            };
+
+            println!("port_name: {:?}", port_name);
             let serial_port = serialport::new(port_name, 115200)
                 .timeout(Duration::from_secs(6))
                 .open();
@@ -142,10 +191,18 @@ fn main() {
 
                         if bytes_read > 7 {
                             // Parse the received data
-                            let message = ddaa_protocol::parse_protocol_message(&mut received_buffer);
+                            let message = ddaa_protocol::parse_protocol_message(
+                                &mut received_buffer
+                            );
                             if let Some(parsed_message) = message {
                                 if parsed_message.command == ddaa_protocol::Command::Ping {
-                                    serial_options.push(SerialPortItem { value: Some(port.name().unwrap()), display_text: port.name().unwrap() });
+                                    serial_options.push
+                                    (
+                                        SerialPortItem {
+                                            value: Some(port.name().unwrap()),
+                                            display_text: port.name().unwrap()
+                                        }
+                                    );
                                     break;
                                 }
                             }
