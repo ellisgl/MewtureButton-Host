@@ -4,7 +4,7 @@ version = 3
 
 [[package]]
 name = "CoreFoundation-sys"
-version = "0.1.4"
+version = "0.1.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d0e9889e6db118d49d88d84728d0e964d973a5680befb5f85f55141beea5c20b"
 dependencies = [
@@ -446,7 +446,7 @@ checksum = "2dffe52ecf27772e601905b7522cb4ef790d2cc203488bbd0e2fe85fcb74566d"
 
 [[package]]
 name = "mewture_daemon"
-version = "0.1.13"
+version = "0.1.17"
 dependencies = [
  "clap",
  "ddaa_protocol",
@@ -462,7 +462,7 @@ dependencies = [
 
 [[package]]
 name = "mewture_setup"
-version = "0.1.13"
+version = "0.1.17"
 dependencies = [
  "ddaa_protocol",
  "dialoguer",
@@ -479,7 +479,7 @@ dependencies = [
 
 [[package]]
 name = "mewture_shared"
-version = "0.1.13"
+version = "0.1.17"
 dependencies = [
  "serde",
 ]
