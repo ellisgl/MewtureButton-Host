@@ -1,6 +1,7 @@
 extern crate serialport;
 
 use home;
+use glob::glob;
 use std::fs;
 use std::fs::File;
 use std::io::Write;
@@ -27,9 +28,10 @@ struct SerialPortItem {
 }
 
 fn main() {
+    // Create the ~/.mewture directory if it doesn't exist, and create the config file path.
     let file_name = match home::home_dir() {
         Some(path) => {
-            match fs::create_dir(path.join(".mewture")) {
+            match fs::create_dir_all(path.join(".mewture")) {
                 Ok(_) => path.join(".mewture/config.toml"),
                 Err(e) => {
                     eprintln!("Failed to create directory: {:?}", e);
@@ -55,11 +57,10 @@ fn main() {
         .unwrap(); // unwraps the Result container to give the actual type.
     pb.set_style(style);
 
-    // Start the spinner
+    // Start the spinner.
     pb.enable_steady_tick(Duration::from_millis(100));
 
-
-    // thread::sleep(Duration::new(5, 0));
+    // Get a list of available audio devices.
     let pa: PulseAudio = PulseAudio::connect(Some("Mewture Button Setup"));
     let devices: Vec<pulser::api::PASourceInfo> = match pa.get_source_info_list() {
         Ok(d) => d,
@@ -78,21 +79,29 @@ fn main() {
 
         let mut found: bool = false;
         for port in dev.ports {
-            if port.available == pa_port_available_t::Unknown || port.available == pa_port_available_t::Yes {
+            if
+                port.available == pa_port_available_t::Unknown ||
+                port.available == pa_port_available_t::Yes
+            {
                 found = true;
                 break;
             }
         }
 
         if found {
-            audio_options.push(AudioItem { value: Some(dev.index), display_text: dev.description.unwrap() });
+            audio_options.push(
+                AudioItem {
+                    value: Some(dev.index),
+                    display_text: dev.description.unwrap()
+                }
+            );
         }
     }
 
     audio_options.push(AudioItem { value: None, display_text: "Cancel".to_string() });
     pb.finish_and_clear();
 
-    // Get a list of available serial ports
+    // Get a list of available serial ports.
     let pb: ProgressBar = ProgressBar::new_spinner();
     pb.set_message("Searching for serial devices...");
     let style = ProgressStyle::default_spinner()
@@ -102,11 +111,14 @@ fn main() {
     pb.set_style(style);
     pb.enable_steady_tick(Duration::from_millis(100));
 
-    let ports: Vec<serialport::SerialPortInfo> = serialport::available_ports().expect("Failed to enumerate serial ports");
+    let ports: Vec<serialport::SerialPortInfo> =
+        serialport::available_ports().expect("Failed to enumerate serial ports");
     let usb_ports: Vec<_> = ports
         .into_iter()
         .filter(|port| match port.port_type {
-            SerialPortType::UsbPort(_) => true,
+            SerialPortType::UsbPort(_) => {
+                true
+            },
             _ => false,
         })
         .collect();
@@ -115,7 +127,42 @@ fn main() {
         return;
     } else {
         for port in usb_ports {
-            let port_name = port.port_name.clone();
+            let port_name: String = match port.port_type {
+                SerialPortType::UsbPort(p) => {
+                     match p.serial_number {
+                        Some(sn) => {
+                            match glob(&format!("/dev/serial/by-id/*{}*", sn))
+                                .expect("Glob error")
+                                .next() {
+                                Some(path) => {
+                                   match path {
+                                        Ok(p) => {
+                                            // We have a matching serial number, return it.
+                                            p.display().to_string()
+                                        },
+                                        _ => {
+                                            // No matching directory, return the port name.
+                                            port.port_name.clone()
+                                        }
+                                    }
+                                },
+                                None => {
+                                    // No matching directory, return the port name.
+                                    port.port_name.clone()
+                                }
+                            }
+                        },
+                        None => {
+                            // No serial number, just use it's port name.
+                            port.port_name.clone()
+                        }
+                    }
+                },
+                _ => {
+                    continue;
+                }
+            };
+
             let serial_port = serialport::new(port_name, 115200)
                 .timeout(Duration::from_secs(6))
                 .open();
@@ -142,10 +189,18 @@ fn main() {
 
                         if bytes_read > 7 {
                             // Parse the received data
-                            let message = ddaa_protocol::parse_protocol_message(&mut received_buffer);
+                            let message = ddaa_protocol::parse_protocol_message(
+                                &mut received_buffer
+                            );
                             if let Some(parsed_message) = message {
                                 if parsed_message.command == ddaa_protocol::Command::Ping {
-                                    serial_options.push(SerialPortItem { value: Some(port.name().unwrap()), display_text: port.name().unwrap() });
+                                    serial_options.push
+                                    (
+                                        SerialPortItem {
+                                            value: Some(port.name().unwrap()),
+                                            display_text: port.name().unwrap()
+                                        }
+                                    );
                                     break;
                                 }
                             }
@@ -165,6 +220,7 @@ fn main() {
 
     pb.finish_and_clear();
 
+    // Create a selection prompt for the audio devices.
     let audio_selection = Select::with_theme(&ColorfulTheme::default())
         .with_prompt("Select an audio device")
         .items(&audio_options.iter().map(|item| item.display_text.as_str()).collect::<Vec<_>>())
@@ -186,6 +242,7 @@ fn main() {
         }
     };
 
+    // Create a selection prompt for the serial ports.
     let serial_selection = Select::with_theme(&ColorfulTheme::default())
         .with_prompt("Select a serial port")
         .items(&serial_options.iter().map(|item| item.display_text.as_str()).collect::<Vec<_>>())
@@ -201,6 +258,7 @@ fn main() {
         }
     };
 
+    // Create the content for the config file.
     let config = mewture_shared::Config {
         audio_device_name: audio_device.name.unwrap(),
         audio_device_index:audio_device.index,
@@ -208,6 +266,7 @@ fn main() {
     };
     let toml = toml::to_string(&config).unwrap();
 
+    // Write the config file.
     let mut file = File::create(file_name).expect("Could not open file.");
     file.write_all(toml.as_bytes()).expect("Could not write TOML config.");
 }

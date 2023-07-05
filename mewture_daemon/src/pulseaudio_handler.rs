@@ -7,6 +7,7 @@ pub struct PulseAudioHandler {
     pulseaudio: PulseAudio
 }
 
+// Abstract the pulser crate for future testing?
 impl PulseAudioHandler {
     // Initialize PulseAudio.
     // I know doing logic in a "constructor" is a bad idea, but I'm lazy.

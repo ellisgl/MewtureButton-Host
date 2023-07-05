@@ -9,6 +9,7 @@ pub struct SerialHandler {
     port: Box<dyn SerialPort>
 }
 
+// Abstract the serialport crate for future testing?
 impl SerialHandler {
     pub fn new(port_path: &str, baud_rate: u32) -> Result<Self, Box<dyn Error>> {
         let port = serialport::new(port_path, baud_rate)
@@ -28,6 +29,4 @@ impl SerialHandler {
         let bytes_written = self.port.write(buffer)?;
         Ok(bytes_written)
     }
-
-
 }
