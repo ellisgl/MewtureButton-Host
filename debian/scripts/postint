@@ -37,13 +37,13 @@ fi
 if [ "$1" = "configure" ] || [ "$1" = "abort-upgrade" ] || [ "$1" = "abort-deconfigure" ] || [ "$1" = "abort-remove" ] ; then
 	if [ -d /run/systemd/system ]; then
 		USER="$(who | head -1 | awk '{print $1;}')"
-		runuser -l $USER -c "XDG_RUNTIME_DIR=/run/user/$(id -u $USER) systemctl --user daemon-reload >/dev/null || true"
+		runuser -l "$USER" -c "XDG_RUNTIME_DIR=/run/user/$(id -u "$USER") systemctl --user daemon-reload >/dev/null || true"
 		if [ -n "$2" ]; then
 			_dh_action=restart
 		else
 			_dh_action=start
 		fi
-		runuser -l $USER -c "XDG_RUNTIME_DIR=/run/user/$(id -u $USER) deb-systemd-invoke --user $_dh_action mewture_daemon.service >/dev/null || true"
+		runuser -l "$USER" -c "XDG_RUNTIME_DIR=/run/user/$(id -u "$USER") deb-systemd-invoke --user $_dh_action mewture_daemon.service >/dev/null || true"
 	fi
 fi
 # End automatically added section

@@ -20,7 +20,7 @@ systemctl --user start mewture_daemon
 
 ```shell
 cargo build -r && cargo deb -p mewture_daemon
-sudo dpkg -i mewture_button_#.#.#_amd64.deb
+sudo dpkg -i target/debian/mewture_button_#.#.#_amd64.deb
 mewture_setup
 systemctl --user start mewture_daemon
 ```
