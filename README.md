@@ -10,6 +10,13 @@ See <https://github.com/ellisgl/MewtureButton-Firmware>
 ## Install from release:
 Download the `mewture_button_#.#.#_amd64.deb`
 
+Pre-requisites:
+* cargo-deb: https://github.com/kornelski/cargo-deb
+* libudev dev packages.
+* Add user to `dialout` group.
+  * sudo adduser $USER dialout
+
+
 ```shell
 sudo dpkg -i mewture_button_#.#.#_amd64.deb
 mewture_setup

@@ -9,6 +9,7 @@ use pulser::simple::PulseAudio;
 use std::fs::read_to_string;
 use std::path::PathBuf;
 use std::process::exit;
+use std::time::Duration;
 use toml;
 
 use crate::pulseaudio_handler::PulseAudioHandler;
@@ -43,22 +44,53 @@ fn main() -> Result<(), Box<dyn Error>> {
     // Print the configuration if debug is enabled.
     if cli.debug {
         println!(
-            "Config:\n    Device index: {:?}\n    Device name: {:?}\n    Serial port: {:?}\n",
-            config.audio_device_index,
+            "Config:\n    Device name: {:?}\n    Serial port: {:?}\n",
             config.audio_device_name,
             config.serial_port
         );
     }
 
+    #[warn(unused_assignments)]
+    let mut pulseaudio: Option<PulseAudioHandler> = None;
+    let mut port: Option<SerialHandler> = None;
+
     // Setup PulseAudio.
-    let mut pulseaudio = PulseAudioHandler::new(
-        PulseAudio::connect(Some("Mewture Button")),
-        config.audio_device_index
-    )?;
+    // Retry initialization every 10 seconds until successful.
+    loop {
+        match PulseAudioHandler::new(
+            PulseAudio::connect(Some("Mewture Button")),
+            config.audio_device_name.clone()
+        ) {
+            Ok(pa) => {
+                pulseaudio = Some(pa);
+                break; // Initialization successful, exit the loop.
+            }
+            Err(e) => {
+                eprintln!("Error initializing PulseAudio: {}", e);
+            }
+        }
 
-    // Setup the serial port.
-    let mut port = SerialHandler::new(&config.serial_port, 115200)?;
+        // Sleep for 10 seconds before retrying.
+        std::thread::sleep(Duration::from_secs(10));
+    }
 
+    // Retry initialization for the serial port.
+    loop {
+        match SerialHandler::new(&config.serial_port, 115200) {
+            Ok(sp) => {
+                port = Some(sp);
+                break; // Initialization successful, exit the loop.
+            }
+            Err(e) => {
+                eprintln!("Error initializing SerialHandler: {}", e);
+            }
+        }
+
+        // Sleep for 10 seconds before retrying.
+        std::thread::sleep(Duration::from_secs(10));
+    }
+
+    let mut pulseaudio = pulseaudio.unwrap();
     // Get the current mute state.
     let mut current_mute_state = pulseaudio.get_mute_state()?;
     if cli.debug {
@@ -66,7 +98,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         println!("Initial mute state: {:?}", current_mute_state);
     }
 
-    run(&mut pulseaudio, &mut port, &mut current_mute_state, cli.debug)
+    run(&mut pulseaudio, &mut port.unwrap(), &mut current_mute_state, cli.debug)
 }
 
 /// Check if the source's mute state has changed.

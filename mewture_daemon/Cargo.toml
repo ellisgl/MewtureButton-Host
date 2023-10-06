@@ -20,7 +20,7 @@ assets = [
 maintainer-scripts = "debian/scripts"
 
 [dependencies]
-clap = { version = "4.3.4", features = ["derive"] }
+clap = { version = "4.4.6", features = ["derive"] }
 ddaa_protocol = { workspace = true }
 home = { workspace = true }
 mewture_shared = { workspace = true }
@@ -28,5 +28,5 @@ mockall = { workspace= true }
 pulser = { workspace = true }
 serde = { workspace = true }
 serialport = { workspace = true }
-tempfile = "3.2.0"
+tempfile = "3.8.0"
 toml = { workspace = true }

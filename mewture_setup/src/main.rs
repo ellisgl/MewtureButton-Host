@@ -17,7 +17,7 @@ use serialport::SerialPortType;
 
 #[derive(Debug)]
 struct AudioItem {
-    value: Option<u32>,
+    value: Option<String>,
     display_text: String,
 }
 
@@ -91,7 +91,7 @@ fn main() {
         if found {
             audio_options.push(
                 AudioItem {
-                    value: Some(dev.index),
+                    value: Some(dev.name.unwrap()),
                     display_text: dev.description.unwrap()
                 }
             );
@@ -229,7 +229,7 @@ fn main() {
 
     let selected_audio_item = &audio_options[audio_selection];
     let audio_device = match selected_audio_item.value.to_owned() {
-        Some(value) => match pa.get_source_info(PAIdent::Index(value)) {
+        Some(value) => match pa.get_source_info(PAIdent::Name(value)) {
             Ok(info) => info,
             Err(e) => {
                 eprintln!("Failed to get audio device: {}", e);
@@ -261,7 +261,6 @@ fn main() {
     // Create the content for the config file.
     let config = mewture_shared::Config {
         audio_device_name: audio_device.name.unwrap(),
-        audio_device_index:audio_device.index,
         serial_port: serial.to_string(),
     };
     let toml = toml::to_string(&config).unwrap();
