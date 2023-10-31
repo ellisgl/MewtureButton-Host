@@ -29,4 +29,9 @@ impl SerialHandler {
         let bytes_written = self.port.write(buffer)?;
         Ok(bytes_written)
     }
+
+    // Return the name (path) of the serialport.
+    pub fn get_name(&mut self) -> Option<String> {
+        self.port.name()
+    }
 }

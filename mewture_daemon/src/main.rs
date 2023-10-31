@@ -1,6 +1,7 @@
 extern crate serialport;
 
 use std::error::Error;
+use std::fmt;
 use clap::Parser;
 use ddaa_protocol::{MessageType, ProtocolMessage};
 use home;
@@ -19,6 +20,17 @@ mod serial_handler;
 mod pulseaudio_handler;
 
 /// Mewture Button Host Software
+#[derive(Debug)]
+struct MewtureError(String);
+
+impl fmt::Display for MewtureError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl Error for MewtureError {}
+
 #[derive(Parser)]
 #[clap(author, version, about, long_about = None)]
 struct Cli {
@@ -52,7 +64,6 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     #[warn(unused_assignments)]
     let mut pulseaudio: Option<PulseAudioHandler> = None;
-    let mut port: Option<SerialHandler> = None;
 
     // Setup PulseAudio.
     // Retry initialization every 10 seconds until successful.
@@ -74,21 +85,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         std::thread::sleep(Duration::from_secs(10));
     }
 
-    // Retry initialization for the serial port.
-    loop {
-        match SerialHandler::new(&config.serial_port, 115200) {
-            Ok(sp) => {
-                port = Some(sp);
-                break; // Initialization successful, exit the loop.
-            }
-            Err(e) => {
-                eprintln!("Error initializing SerialHandler: {}", e);
-            }
-        }
-
-        // Sleep for 10 seconds before retrying.
-        std::thread::sleep(Duration::from_secs(10));
-    }
+    // Initialization the serial port, with retry.
+    let port: Option<SerialHandler> = init_serial(&config.serial_port, 115200, cli.debug);
 
     let mut pulseaudio = pulseaudio.unwrap();
     // Get the current mute state.
@@ -256,7 +254,14 @@ fn handle_serial_data(
 ) -> Result<(), Box<dyn Error>> {
     let bytes_read = match port.read(received_buffer) {
         Ok(bytes_read) => bytes_read,
-        Err(_e) => { 0 }
+        Err(e) => {
+            let error = e.downcast::<std::io::Error>().unwrap().to_string();
+            if error == "Broken pipe" {
+                return Err(Box::new(MewtureError("Disconnected".into())));
+            }
+            // Else, set 0.
+            0
+        }
     };
 
     if bytes_read > 7 {
@@ -348,6 +353,30 @@ fn handle_write_request(
     Ok(())
 }
 
+/// Initialize serial port (or re-initialize if there was a disconnect).
+fn init_serial(port_path: &str, baud_rate: u32, debug: bool) -> Option<SerialHandler> {
+    let mut port: Option<SerialHandler> = None;
+
+    loop {
+        match SerialHandler::new(port_path, baud_rate) {
+            Ok(sp) => {
+                port = Some(sp);
+                break; // Initialization successful, exit the loop.
+            }
+            Err(e) => {
+                if debug {
+                    eprintln!("Error initializing SerialHandler: {}", e);
+                }
+            }
+        }
+
+        // Sleep for 10 seconds before retrying.
+        std::thread::sleep(Duration::from_secs(10));
+    }
+
+    return port;
+}
+
 /// Respond to a ping message.
 fn respond_to_ping(port: &mut SerialHandler, message: ProtocolMessage) {
     match port.write(&ddaa_protocol::create_protocol_buffer(
@@ -375,7 +404,25 @@ fn run(
     let mut received_buffer: Vec<u8> = vec![0; 64];
     loop {
         // Handle incoming serial data.
-        handle_serial_data(port, pulseaudio, &mut received_buffer, current_mute_state, debug)?;
+        let s_result = match handle_serial_data(port, pulseaudio, &mut received_buffer, current_mute_state, debug) {
+            Ok(_) => { 0 },
+            Err(e) => {
+                let error = e.to_string();
+                match error {
+                    _ if error == "Disconnected" => { 1 },
+                    _ => panic!("Unknown serial error.")
+                }
+            }
+        };
+
+        if s_result == 1 {
+            if debug {
+                eprintln!("Disconnected: {:?}", port.get_name().unwrap());
+            }
+
+            let port_path: &str = &port.get_name().unwrap()[..];
+            *port = init_serial(port_path, 115200, debug).unwrap();
+        }
 
         // Check if the source mute state has changed.
         check_for_mute_state_change(pulseaudio, port, current_mute_state, debug)?;
