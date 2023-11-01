@@ -402,7 +402,7 @@ checksum = "f665ee40bc4a3c5590afb1e9677db74a508659dfd71e126420da8274909a0167"
 
 [[package]]
 name = "mewture_daemon"
-version = "0.1.23"
+version = "0.1.25"
 dependencies = [
  "clap",
  "ddaa_protocol",
@@ -418,7 +418,7 @@ dependencies = [
 
 [[package]]
 name = "mewture_setup"
-version = "0.1.23"
+version = "0.1.24"
 dependencies = [
  "ddaa_protocol",
  "dialoguer",
@@ -435,7 +435,7 @@ dependencies = [
 
 [[package]]
 name = "mewture_shared"
-version = "0.1.23"
+version = "0.1.24"
 dependencies = [
  "serde",
 ]
