@@ -8,13 +8,13 @@ members = [
 
 [workspace.package]
 name = "mewture_button"
-version = "0.1.25"
+version = "0.1.26"
 edition = "2021"
 license = "BSD-3-Clause"
 authors = ["EllisGL"]
 
 [workspace.dependencies]
-ddaa_protocol = "0.2.0"
+ddaa_protocol = "0.2.1"
 home = "0.5.5"
 libc = "0.2.144"
 libpulse-sys = "1.20.1"
