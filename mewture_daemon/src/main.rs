@@ -6,6 +6,7 @@ use clap::Parser;
 use ddaa_protocol::{MessageType, ProtocolMessage};
 use home;
 use mewture_shared;
+use mewture_shared::frame::FrameAccumulator;
 use pulser::simple::PulseAudio;
 use std::fs::read_to_string;
 use std::path::PathBuf;
@@ -245,10 +246,13 @@ fn handle_request(
 }
 
 /// Handle incoming serial data.
+///
+/// Bytes are added to `frames`, which keeps partial frames between reads, then every complete frame is handled.
 fn handle_serial_data(
     port: &mut SerialHandler,
     pulseaudio: &mut PulseAudioHandler,
     received_buffer: &mut [u8],
+    frames: &mut FrameAccumulator,
     current_mute_state: &mut bool,
     debug: bool
 ) -> Result<(), Box<dyn Error>> {
@@ -264,9 +268,11 @@ fn handle_serial_data(
         }
     };
 
-    if bytes_read > 7 {
+    frames.push(&received_buffer[..bytes_read]);
+
+    while let Some(mut frame) = frames.next_frame() {
         // Parse the received data.
-        let message = ddaa_protocol::parse_protocol_message(received_buffer.to_vec().as_mut());
+        let message = ddaa_protocol::parse_protocol_message(&mut frame);
         if debug {
             // Print the incoming message if debug is enabled.
             println!("Incoming message: {:?}", message);
@@ -274,10 +280,6 @@ fn handle_serial_data(
 
         if let Some(parsed_message) = message {
             if parsed_message.message_type == MessageType::Request {
-                if debug {
-                    println!("Received request: {:?}", parsed_message);
-                }
-
                 handle_request(
                     pulseaudio,
                     port,
@@ -287,8 +289,6 @@ fn handle_serial_data(
                 )?
             }
         }
-    } else if bytes_read > 0 && bytes_read <= 7 {
-        // We could handle this, but we can just ignore and continue for now.
     }
 
     Ok(())
@@ -402,9 +402,17 @@ fn run(
     debug: bool
 ) -> Result<(), Box<dyn Error>> {
     let mut received_buffer: Vec<u8> = vec![0; 64];
+    let mut frames = FrameAccumulator::new();
     loop {
         // Handle incoming serial data.
-        let s_result = match handle_serial_data(port, pulseaudio, &mut received_buffer, current_mute_state, debug) {
+        let s_result = match handle_serial_data(
+            port,
+            pulseaudio,
+            &mut received_buffer,
+            &mut frames,
+            current_mute_state,
+            debug
+        ) {
             Ok(_) => { 0 },
             Err(e) => {
                 let error = e.to_string();
@@ -422,14 +430,12 @@ fn run(
 
             let port_path: &str = &port.get_name().unwrap()[..];
             *port = init_serial(port_path, 115200, debug).unwrap();
+            // Anything left over from before the disconnect is stale.
+            frames.clear();
         }
 
         // Check if the source mute state has changed.
         check_for_mute_state_change(pulseaudio, port, current_mute_state, debug)?;
-
-        // Clear the buffer.
-        received_buffer.clear();
-        received_buffer.resize(64, 0);
     }
 }
 

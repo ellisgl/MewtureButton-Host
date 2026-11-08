@@ -1,3 +1,5 @@
+pub mod frame;
+
 use serde::{ Deserialize, Serialize };
 
 /// Configuration to store the audio device and serial port information.

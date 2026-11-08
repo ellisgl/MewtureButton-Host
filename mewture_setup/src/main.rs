@@ -6,11 +6,12 @@ use std::fs;
 use std::fs::File;
 use std::io::Write;
 use std::process::exit;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use dialoguer::{Select, theme::ColorfulTheme};
 use indicatif::{ProgressBar, ProgressStyle};
 use libpulse_sys::pa_port_available_t;
 use mewture_shared;
+use mewture_shared::frame::FrameAccumulator;
 use pulser::api::PAIdent;
 use pulser::simple::PulseAudio;
 use serialport::SerialPortType;
@@ -170,15 +171,13 @@ fn main() {
             match serial_port {
                 Ok(mut port) => {
                     let mut received_buffer: Vec<u8> = vec![0; 64];
+                    let mut frames = FrameAccumulator::new();
+                    let mut found = false;
                     let mut read_attempts = 0;
+                    // Same worst case as 5 read timeouts, but also stops a port that keeps sending non-DDAA data.
+                    let deadline = Instant::now() + Duration::from_secs(30);
 
-                    loop {
-                        if read_attempts >= 5 {
-                            // Maximum read attempts reached, break the loop.
-                            eprintln!("Exceeded maximum read attempts");
-                            break;
-                        }
-
+                    while read_attempts < 5 && Instant::now() < deadline {
                         let bytes_read = match port.read(&mut received_buffer) {
                             Ok(bytes_read) => bytes_read,
                             Err(_error) => {
@@ -187,26 +186,32 @@ fn main() {
                             }
                         };
 
-                        if bytes_read > 7 {
+                        frames.push(&received_buffer[..bytes_read]);
+                        while let Some(mut frame) = frames.next_frame() {
                             // Parse the received data
-                            let message = ddaa_protocol::parse_protocol_message(
-                                &mut received_buffer
-                            );
-                            if let Some(parsed_message) = message {
+                            if let Some(parsed_message) = ddaa_protocol::parse_protocol_message(&mut frame) {
                                 if parsed_message.command == ddaa_protocol::Command::Ping {
-                                    serial_options.push
-                                    (
-                                        SerialPortItem {
-                                            value: Some(port.name().unwrap()),
-                                            display_text: port.name().unwrap()
-                                        }
-                                    );
+                                    found = true;
                                     break;
                                 }
                             }
-
-                            read_attempts += 1;
                         }
+
+                        if found {
+                            break;
+                        }
+                    }
+
+                    if found {
+                        serial_options.push(
+                            SerialPortItem {
+                                value: Some(port.name().unwrap()),
+                                display_text: port.name().unwrap()
+                            }
+                        );
+                    } else {
+                        // Maximum read attempts reached without seeing a ping.
+                        eprintln!("Exceeded maximum read attempts");
                     }
                 },
                 Err(error) => {
