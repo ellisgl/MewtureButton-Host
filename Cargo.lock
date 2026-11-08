@@ -166,9 +166,9 @@ dependencies = [
 
 [[package]]
 name = "ddaa_protocol"
-version = "0.2.0"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "86a2de39c3fd322e713807a0188e4928d5be7d27fe02e214d3b6666eccb64949"
+checksum = "c901c7b628130ca517c7ccf24be23d44b5dc6cb83273080a2b3e9c65f3a8fc9d"
 
 [[package]]
 name = "dialoguer"
@@ -409,7 +409,7 @@ checksum = "f665ee40bc4a3c5590afb1e9677db74a508659dfd71e126420da8274909a0167"
 
 [[package]]
 name = "mewture_daemon"
-version = "0.1.25"
+version = "0.1.26"
 dependencies = [
  "clap",
  "ddaa_protocol",
@@ -425,7 +425,7 @@ dependencies = [
 
 [[package]]
 name = "mewture_setup"
-version = "0.1.25"
+version = "0.1.26"
 dependencies = [
  "ddaa_protocol",
  "dialoguer",
@@ -442,7 +442,7 @@ dependencies = [
 
 [[package]]
 name = "mewture_shared"
-version = "0.1.25"
+version = "0.1.26"
 dependencies = [
  "serde",
 ]
